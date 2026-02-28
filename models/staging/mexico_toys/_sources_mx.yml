@@ -1,0 +1,45 @@
+version: 2
+
+sources:
+  - name: mexico_toys
+    database: airbyte_curso
+    schema: raw_mexico_toys
+    tables:
+      - name: raw_sales_mexico_toys
+        description: "Transacciones de ventas de tiendas de juguetes en México"
+        columns:
+          - name: Sale_ID
+            description: "Identificador único de venta"
+          - name: Date
+            description: "Fecha de la venta"
+          - name: Store_ID
+            description: "ID de la tienda"
+          - name: Product_ID
+            description: "ID del producto"
+          - name: Units
+            description: "Unidades vendidas"
+
+      - name: raw_products_mexico_toys
+        description: "Catálogo de productos"
+        columns:
+          - name: Product_ID
+          - name: Product_Name
+          - name: Product_Category
+          - name: Product_Cost
+          - name: Product_Price
+
+      - name: raw_stores_mexico_toys
+        description: "Tiendas en México"
+        columns:
+          - name: Store_ID
+          - name: Store_Name
+          - name: Store_City
+          - name: Store_Location
+          - name: Store_Open_Date
+
+      - name: raw_inventory_mexico_toys
+        description: "Stock disponible por tienda y producto"
+        columns:
+          - name: Store_ID
+          - name: Product_ID
+          - name: Stock_On_Hand

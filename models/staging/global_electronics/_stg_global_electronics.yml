@@ -1,0 +1,63 @@
+version: 2
+
+models:
+  - name: stg_global_electronics__sales
+    columns:
+      - name: order_number
+        tests:
+          - not_null
+      - name: order_date
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: "'2016-01-01'::date"
+              max_value: "'2021-12-31'::date"
+      - name: units
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+              max_value: 100
+
+  - name: stg_global_electronics__products
+    columns:
+      - name: product_id
+        tests:
+          - not_null
+          - unique
+      - name: product_cost
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 5000
+      - name: product_price
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 5000
+
+  - name: stg_global_electronics__customers
+    columns:
+      - name: customer_id
+        tests:
+          - not_null
+          - unique
+      - name: gender
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_in_set:
+              value_set: ["Male", "Female"]
+
+  - name: stg_global_electronics__exchange_rates
+    columns:
+      - name: rate_date
+        tests:
+          - not_null
+      - name: exchange_rate
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 1000

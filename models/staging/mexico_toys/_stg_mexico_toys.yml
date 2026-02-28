@@ -1,0 +1,61 @@
+version: 2
+
+models:
+  - name: stg_mexico_toys__sales
+    columns:
+      - name: sale_id
+        tests:
+          - not_null
+          - unique
+      - name: sale_date
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: "'2022-01-01'::date"
+              max_value: "'2023-12-31'::date"
+      - name: units
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+              max_value: 100
+
+  - name: stg_mexico_toys__products
+    columns:
+      - name: product_id
+        tests:
+          - not_null
+          - unique
+      - name: product_cost
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 1000
+      - name: product_price
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 1000
+
+  - name: stg_mexico_toys__stores
+    columns:
+      - name: store_id
+        tests:
+          - not_null
+          - unique
+      - name: country
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_in_set:
+              value_set: ["Mexico"]
+
+  - name: stg_mexico_toys__inventory
+    columns:
+      - name: stock_on_hand
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 10000

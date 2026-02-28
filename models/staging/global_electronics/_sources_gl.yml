@@ -1,0 +1,63 @@
+version: 2
+
+sources:
+  - name: global_electronics
+    database: airbyte_curso
+    schema: raw_global_electronics
+    tables:
+      - name: raw_sales_global_electronics
+        description: "Órdenes de venta del retailer global"
+        columns:
+          - name: Order Number
+          - name: Line Item
+          - name: Order Date
+          - name: Delivery Date
+          - name: CustomerKey
+          - name: StoreKey
+          - name: ProductKey
+          - name: Quantity
+          - name: Currency Code
+
+      - name: raw_products_global_electronics
+        description: "Catálogo de productos electrónicos"
+        columns:
+          - name: ProductKey
+          - name: Product Name
+          - name: Brand
+          - name: Color
+          - name: Unit Cost USD
+          - name: Unit Price USD
+          - name: SubcategoryKey
+          - name: Subcategory
+          - name: CategoryKey
+          - name: Category
+
+      - name: raw_stores_global_electronics
+        description: "Tiendas globales"
+        columns:
+          - name: StoreKey
+          - name: Country
+          - name: State
+          - name: Square Meters
+          - name: Open Date
+
+      - name: raw_customers_global_electronics
+        description: "Clientes del retailer global"
+        columns:
+          - name: CustomerKey
+          - name: Gender
+          - name: Name
+          - name: City
+          - name: State Code
+          - name: State
+          - name: Zip Code
+          - name: Country
+          - name: Continent
+          - name: Birthday
+
+      - name: raw_exchange_rate_global_electronics
+        description: "Tipos de cambio por fecha y moneda"
+        columns:
+          - name: Date
+          - name: Currency
+          - name: Exchange
