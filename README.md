@@ -23,13 +23,17 @@ Pipeline de datos end-to-end que integra dos fuentes de retail, aplica transform
 
 | Herramienta | Versión | Rol |
 |-------------|---------|-----|
-| **Airbyte Cloud** | Latest | Extracción y carga de datos (EL) |
+| **Airbyte Cloud** | Latest | Extracción y carga de datos (EL) — 9 conexiones |
 | **MotherDuck** | Cloud | Base de datos analítica (DuckDB Cloud) |
 | **dbt Core** | 1.11.6 | Transformación, testing y documentación |
 | **dbt-duckdb** | 1.10.1 | Adaptador dbt para MotherDuck |
-| **dbt-expectations** | >=0.10.0 | Tests de calidad de datos |
-| **Prefect** | 3.6.20 | Orquestación del pipeline |
-| **Metabase** | 0.52.9 | Dashboard de Business Intelligence |
+| **dbt-expectations** | 0.10.4 | Tests de calidad de datos |
+| **dbt_utils** | 1.3.3 | Utilidades para macros y tests genéricos |
+| **Prefect** | 3.6.20 | Orquestación del pipeline (10 tasks) |
+| **prefect-shell** | 0.3.3 | Integración de comandos shell en Prefect |
+| **Metabase** | 0.52.9 (JAR) | Dashboard de Business Intelligence |
+| **DuckDB Metabase Driver** | Community | Plugin para conectar Metabase a MotherDuck |
+| **Java** | 25.0.2 (Temurin) | Runtime requerido para Metabase JAR |
 
 ---
 
@@ -40,12 +44,14 @@ Pipeline de datos end-to-end que integra dos fuentes de retail, aplica transform
 - **Tablas:** `sales`, `products`, `stores`, `inventory`
 - **Registros:** 829,262 transacciones
 - **Moneda:** USD
+- **Sync mode:** Manual (CSV estático)
 
 ### Fuente 2 — Global Electronics Retailer
 - **Origen:** [Maven Analytics](https://maven-datasets.s3.amazonaws.com/Global+Electronics+Retailer/Global+Electronics+Retailer.zip)
 - **Tablas:** `sales`, `customers`, `products`, `stores`, `exchange_rates`
 - **Registros:** 62,884 transacciones
 - **Moneda:** Múltiples (normalizado a USD via exchange_rates)
+- **Sync mode:** Manual (CSV estático)
 
 ---
 
@@ -54,21 +60,24 @@ Pipeline de datos end-to-end que integra dos fuentes de retail, aplica transform
 ```
 ┌─────────────────┐     ┌──────────────┐     ┌─────────────┐     ┌───────────┐
 │  Airbyte Cloud  │────▶│  MotherDuck  │────▶│  dbt Core   │────▶│ Metabase  │
-│  (EL - 2 fuentes)│    │  (DuckDB)    │     │  (Transform)│     │(Dashboard)│
+│  9 conexiones   │     │  (DuckDB)    │     │  (Transform)│     │(Dashboard)│
 └─────────────────┘     └──────────────┘     └─────────────┘     └───────────┘
-                                                      │
-                                              ┌───────▼───────┐
-                                              │    Prefect    │
-                                              │ (Orquestación)│
-                                              └───────────────┘
+         ▲                                           ▲
+         │                                           │
+         └──────────────┬────────────────────────────┘
+                        │
+                 ┌──────▼───────┐
+                 │    Prefect   │
+                 │  10 tasks    │
+                 └──────────────┘
 ```
 
 ### Capas dbt
 
 ```
 airbyte_curso (MotherDuck)
-├── raw_mexico_toys          ← Cargado por Airbyte
-├── raw_global_electronics   ← Cargado por Airbyte
+├── raw_mexico_toys          ← Cargado por Airbyte (4 tablas)
+├── raw_global_electronics   ← Cargado por Airbyte (5 tablas)
 ├── main_staging             ← Limpieza y estandarización (views)
 ├── main_intermediate        ← Transformaciones intermedias (views)
 └── main_marts               ← Modelo dimensional final (tables)
@@ -79,7 +88,7 @@ airbyte_curso (MotherDuck)
 ## 📁 Estructura del Proyecto
 
 ```
-retail_project/
+proyecto_final/
 ├── models/
 │   ├── staging/
 │   │   ├── mexico_toys/
@@ -107,9 +116,11 @@ retail_project/
 │       └── facts/
 │           ├── _fact_sales.yml
 │           └── fact_sales.sql
-├── pipeline_flow.py         ← Orquestación Prefect
+├── pipeline.py              ← Orquestación Prefect (10 tasks)
+├── pipeline.env             ← Variables de entorno (no subir a GitHub)
 ├── packages.yml
 ├── dbt_project.yml
+├── .gitignore
 └── README.md
 ```
 
@@ -150,17 +161,11 @@ Esquema en estrella (Star Schema) con una fact table central y 4 dimensiones:
 ### Prerrequisitos
 - Python 3.11+
 - dbt-core 1.11.6 + dbt-duckdb 1.10.1
-- Cuenta en MotherDuck
-- Cuenta en Airbyte Cloud
+- Cuenta en MotherDuck con base de datos `airbyte_curso`
+- Cuenta en Airbyte Cloud con datos sincronizados
 - Java 21+ (para Metabase JAR)
 
-### 1. Clonar el proyecto
-```bash
-cd C:\Users\HP VICTUS\
-# El proyecto ya está en proyecto_final/
-```
-
-### 2. Configurar profiles.yml
+### 1. Configurar profiles.yml
 En `C:\Users\HP VICTUS\.dbt\profiles.yml`:
 
 ```yaml
@@ -175,42 +180,50 @@ retail_project:
       threads: 4
 ```
 
-### 3. Setear variable de entorno
-```cmd
-setx MOTHERDUCK_TOKEN "tu_token_aqui"
+### 2. Crear pipeline.env
+En la raíz del proyecto:
+
+```env
+DBT_PROJECT_DIR=C:\Users\HP VICTUS\proyecto_final
+DBT_PROFILES_DIR=C:\Users\HP VICTUS\.dbt
+MOTHERDUCK_TOKEN=tu_token_aqui
+AIRBYTE_API_KEY=   # Opcional: requiere plan Team/Enterprise
 ```
 
-### 4. Instalar dependencias dbt
+### 3. Instalar dependencias dbt
 ```cmd
 cd proyecto_final
 dbt deps
 ```
 
-### 5. Instalar Prefect
+### 4. Instalar dependencias Python
 ```cmd
-python -m pip install prefect
+python -m pip install prefect prefect-dbt prefect-shell python-dotenv
 ```
 
 ---
 
 ## 🚀 Ejecución
 
-### Pipeline completo con Prefect
+### Pipeline completo con Prefect (recomendado)
 ```cmd
 cd C:\Users\HP VICTUS\proyecto_final
-python pipeline_flow.py
+python pipeline.py
 ```
 
 ### Ejecución manual con dbt
 ```cmd
-# Solo staging
-dbt run --select staging
+# Staging — fuente 1
+dbt run --select path:models/staging/mexico_toys
 
-# Solo marts
-dbt run --select marts
+# Staging — fuente 2
+dbt run --select path:models/staging/global_electronics
 
-# Todo
-dbt run
+# Dimensiones
+dbt run --select path:models/marts/dimensions
+
+# Fact table
+dbt run --select path:models/marts/facts
 
 # Tests
 dbt test
@@ -221,6 +234,13 @@ dbt test
 dbt docs generate
 dbt docs serve
 # Abre http://localhost:8080
+```
+
+### Levantar Metabase
+```cmd
+cd C:\metabase
+java -jar metabase.jar
+# Abre http://localhost:3000
 ```
 
 ---
@@ -242,11 +262,29 @@ dbt docs serve
 
 ## 🔄 Orquestación con Prefect
 
-El archivo `pipeline_flow.py` define el flow `retail_analytics_pipeline` con 2 tasks secuenciales:
+El archivo `pipeline.py` define el flow `retail_analytics_pipeline` con **10 tasks secuenciales**:
 
 ```
-dbt_run (retries=1) → dbt_test (retries=1)
+airbyte_sync_mx → airbyte_sync_gl → dbt_deps →
+dbt_run_staging_mx → dbt_run_staging_gl →
+dbt_run_dimensions → dbt_run_facts →
+dbt_test_staging → dbt_test_marts → dbt_docs_generate
 ```
+
+| Task | Descripción |
+|------|-------------|
+| `airbyte sync - mexico toys` | Triggerea sync de 4 conexiones via API (simulado en plan Trial) |
+| `airbyte sync - global electronics` | Triggerea sync de 5 conexiones via API (simulado en plan Trial) |
+| `dbt deps` | Instala paquetes dbt-expectations y dbt_utils |
+| `dbt run - staging mexico_toys` | Limpieza y tipado de 4 modelos staging MX |
+| `dbt run - staging global_electronics` | Limpieza y tipado de 5 modelos staging GL |
+| `dbt run - marts dimensions` | Construye dim_date, dim_product, dim_store, dim_customer |
+| `dbt run - marts facts` | Construye fact_sales unificada en USD (892K registros) |
+| `dbt test - staging` | Valida calidad de datos en staging |
+| `dbt test - marts` | Valida calidad de datos en marts (48 tests) |
+| `dbt docs generate` | Genera documentación y lineage graph |
+
+> **Nota sobre Airbyte API:** La integración completa requiere API Key de Airbyte Cloud (plan Team/Enterprise). En el plan Trial las tasks de sync corren en modo simulado — el código está listo para activarse cuando se disponga del API Key.
 
 **Resultado:** Flow run completado en ~2 minutos — Finished in state `Completed()`
 
@@ -254,15 +292,15 @@ dbt_run (retries=1) → dbt_test (retries=1)
 
 ## 📊 Dashboard
 
-Dashboard en Metabase con **4 KPIs** y **6 visualizaciones**:
+Dashboard en Metabase con **4 KPIs**, **6 visualizaciones** y **filtro interactivo de fecha**:
 
 ### KPIs
 | KPI | Valor |
 |-----|-------|
-| Revenue Total USD | $71,975,910 |
+| Revenue Total USD | $72.0M |
 | Total Transacciones | 892,146 |
-| Ganancia Total USD | ~$40M |
-| Margen Promedio | ~55% |
+| Ganancia Total USD | $37.7M |
+| Margen Promedio Global | 52.4% |
 
 ### Visualizaciones
 1. 📈 Ventas totales por mes (línea)
@@ -271,6 +309,9 @@ Dashboard en Metabase con **4 KPIs** y **6 visualizaciones**:
 4. 💰 Margen de ganancia por categoría (barras)
 5. 📦 Inventario vs ventas por producto (barras agrupadas)
 6. 🔀 Revenue por fuente de datos (barras)
+
+### Filtros Interactivos
+- **Fecha** — Field Filter tipo Date Range conectado a `fact_sales.sale_date`. Controla todas las visualizaciones simultáneamente.
 
 ### Iniciar Metabase
 ```cmd
@@ -284,5 +325,14 @@ java -jar metabase.jar
 ## 📈 Hallazgos Principales
 
 - **Global Electronics** genera ~$57.5M USD vs ~$14.4M de Mexico Toys, con 13x menos transacciones — tickets promedio mucho más altos en electrónica.
-- El **margen de ganancia promedio supera el 55%** en ambas fuentes.
+- El **margen de ganancia promedio es 52.4%** en ambas fuentes combinadas.
+- **EE.UU. es el mercado líder** con ~$22M en revenue, seguido por Mexico con ~$14M.
 - Mexico Toys mantiene **buena cobertura de inventario** para sus productos más vendidos.
+
+---
+
+## 👥 Integrantes
+
+Cinthia Segovia · Jessica Pizarro · Alan Amarilla · Rodrigo Franco
+
+**Introducción a la Ingeniería de Datos — MIA 03 — Febrero 2026**
